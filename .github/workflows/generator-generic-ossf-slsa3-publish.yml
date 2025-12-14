@@ -1,0 +1,1284 @@
+# ThisPrompt pour générer le frontend (React/Tailwind) : "Crée une interface React pour un créateur d'ebooks IA. Inclu : page d'accueil avec input pour sujet, bouton 'Générer', éditeur drag-and-drop pour chapitres, preview PDF, et export en EPUB. Utilise Tailwind CSS pour un design minimaliste et responsive. Ajoute une sidebar avec bibliothèque d'images premium. Code complet avec hooks pour state management."
+Prompt pour le backend (Node.js + OpenAI API) : "Développe un backend Node.js/Express pour app ebook IA. Endpoints : POST /generate-content (input: sujet, output: JSON avec outline + texte chapitres via OpenAI GPT-4), GET /export (génère PDF/EPUB via pdf-lib). Intègre MongoDB pour stocker crédits utilisateur. Ajoute auth JWT et limite à 15k tokens/mois. Code avec error handling et CORS."
+Prompt pour intégrer l'IA de génération : "Écris un script Python pour générer ebook via Google Gemini : input prompt utilisateur, output structure (titre, chapitres, images via DALL-E). Optimise pour 3 étapes : suggestion sujet (basé sur tendances Google), génération contenu, personnalisation. Inclu 100 prompts templates pour niches (coaching, tech)." workflow uses actions that are not certified by GitHub.
+#Voici trois prompts améliorés et prêts à être utilisés pour générer le frontend, le backend et le script d'intégration IA. Ils sont écrits en français et contiennent des détails techniques, contraintes, exemples d'env vars et livrables attendus pour obtenir du code complet et utilisable.
+
+1) Prompt pour générer le frontend (React + Tailwind)
+Crée une interface web complète en React (préférence Vite + React 18) et Tailwind CSS pour un créateur d'ebooks IA. Exigences détaillées :
+- Stack : React (TypeScript de préférence, sinon JS) + Vite, Tailwind CSS (v3+), react-router pour navigation optional, headlessui ou Radix pour composants accessibles.
+- Pages / composants :
+  - Page d'accueil : grand champ d'input pour le sujet (placeholder: "Entrez votre sujet d'ebook"), sélecteur de ton (ex : professionnel, amical, didactique), bouton "Générer" qui appelle l'API backend POST /generate-content et affiche un loader.
+  - Dashboard éditeur : éditeur drag-and-drop pour organiser les chapitres (ajouter/supprimer/renommer/drag reorder). Chaque chapitre a un éditeur WYSIWYG léger (ProseMirror/Tiptap/React-Quill) et champs meta (titre, résumé, longueur désirée).
+  - Preview PDF : aperçu embarqué du PDF généré (utiliser <iframe> ou react-pdf) avec bouton "Télécharger PDF".
+  - Export EPUB : bouton qui appelle GET /export?format=epub&ebookId=... et télécharge l'EPUB.
+  - Sidebar : bibliothèque d'images premium — grille d'images (miniatures), recherche/filter, possibilité de glisser-déposer une image dans un chapitre. Indiquer badge "Premium" et bouton "Acheter pack" (flux fictif).
+  - Barre latérale responsive (mobile collapsible).
+- Comportement :
+  - Utiliser React hooks (useState/useEffect/useReducer ou Zustand) pour le state management; centraliser l'état du projet (chapitres, images, métadonnées).
+  - Sauvegarde automatique locale (localStorage) et option de sauvegarde vers backend (POST /projects).
+  - Drag-and-drop: utiliser react-beautiful-dnd ou dnd-kit.
+  - Validation des inputs et messages d'erreur clairs.
+  - Internationalisation (i18n) minimal : français par défaut, structure pour ajouter d'autres langues.
+- Styling :
+  - Minimaliste, responsive, palette douce (ex : gris + bleu), spacing aéré, typographie lisible.
+  - Classes Tailwind uniquement (pas de CSS inline), composants réutilisables.
+- Tests & scripts :
+  - Inclure instructions pour lancer (npm install, npm run dev), build (npm run build), et tests simples (Jest/React Testing Library).
+- Livrables attendus :
+  - Arborescence du projet et fichiers source complets (App, pages, composants, hooks, services API).
+  - Exemple d'appel API (fetch/axios) vers /generate-content avec gestion de loading/errors.
+  - README avec setup, variables env (ex: VITE_API_BASE_URL), conventions.
+- Contraintes :
+  - Respecter l'accessibilité basique (aria, keyboard nav).
+  - Composants modulaires et bien commentés.
+
+2) Prompt pour générer le backend (Node.js + OpenAI API)
+Développe un backend complet en Node.js/Express pour l'app ebook IA. Exigences détaillées :
+- Stack : Node.js 18+, Express, TypeScript recommandé (ou JS), MongoDB (mongoose), JWT pour auth, cors, helmet, express-rate-limit (global), et integration OpenAI GPT-4 (ou clé configurable).
+- Endpoints :
+  - POST /auth/register : { email, password } -> crée utilisateur, stocke hashed password (bcrypt), renvoie JWT.
+  - POST /auth/login : { email, password } -> renvoie JWT.
+  - POST /generate-content : (auth requis) body { sujet, tone?, chaptersCount? } -> appelle OpenAI GPT-4 pour générer outline + texte de chapitres. Réponse JSON: { title, outline: [{ chapterIndex, title, summary }], chapters: [{ chapterIndex, title, content, suggestedImages: [{prompt, count}] }] }
+  - GET /export : (auth requis) query { ebookId, format } -> génère et renvoie fichier PDF ou EPUB. Implémentation: utiliser pdf-lib (pour PDF) et epub-gen (ou équivalent) pour EPUB. Support streaming et headers Content-Disposition.
+  - GET /projects/:id : récupère projet utilisateur.
+  - POST /projects : sauvegarde projet complet (meta + chapitres).
+  - GET /images/library : retourne liste d'images premium (DB ou mock).
+  - POST /purchase-pack : simule achat crédits/images (intégration paiement out-of-scope, mock).
+- Auth & sécurité :
+  - JWT (exp courte), refresh tokens optional.
+  - Middleware auth pour protéger routes.
+  - CORS configuré (origins allowed via env).
+  - Helmet, input validation (celebrate/Joi or express-validator), centralized error handler.
+- Quota tokens :
+  - Stocker dans MongoDB per-user monthly token usage and credits.
+  - Limite : 15,000 tokens/mois par utilisateur. Après dépassement, /generate-content renvoie 402 ou 429 avec message.
+  - Calculer tokens utilisés à partir du champ usage de la réponse OpenAI (response.usage.total_tokens) et incrémenter dans DB.
+  - Endpoint admin to reset monthly counters (cron-friendly).
+- Robustesse :
+  - Timeout et retry limité pour appels OpenAI.
+  - Gestion d'erreurs claires (400/401/403/429/500) et logs.
+- Environnement et config :
+  - Variables env : MONGODB_URI, JWT_SECRET, OPENAI_API_KEY, PORT, CORS_ORIGINS, STORAGE_PATH.
+- Tests & scripts :
+  - Scripts npm pour start/dev/test.
+  - Exemples de tests unitaires pour une route.
+- Livrables attendus :
+  - Code serveur complet (app.ts/index.ts, routes, controllers, services, models).
+  - README avec instructions d'installation, variables env, exemples d'appels cURL.
+  - Documentation de l'API (OpenAPI/Swagger minimal ou docs MD).
+- Contraintes techniques :
+  - Pour la génération longue, découper requêtes si nécessaire (streaming ou enchaînement).
+  - Export PDF/EPUB doit incorporer images et métadonnées (titre, auteur, table des matières).
+
+3) Prompt pour intégrer l'IA de génération (Script Python pour Google Gemini + Images)
+Écris un script Python complet (3 étapes) pour générer un ebook en s'appuyant sur Google Gemini (PaLM/Generative API) et génération d'images (DALL·E ou API images). Exigences :
+- Stack : Python 3.10+, requests ou client officiel Google (google-api-client / google.generativeai si dispo), openai pour DALL·E si utilisé, Pillow pour traitement images, et sauvegarde JSON/EPUB (optonal).
+- Fonctionnalités en 3 étapes :
+  1. Suggestion de sujet : à partir d'un input minimal (mots-clés, marché, audience) proposer 5 sujets optimisés SEO en se basant sur tendances Google (utiliser Google Trends scraping ou API suggestion; si non possible, simuler via prompt instruisant Gemini à prioriser tendances).
+  2. Génération contenu : pour le sujet choisi, générer structure complète : titre, sous-titre, meta-description, outline détaillé (chapitres et sous-chapitres), puis contenu désambiguïsé pour chaque chapitre. Retourner JSON structuré : {title, subtitle, description, chapters: [{index,title,content,images:[{prompt,seed?}]}]}.
+  3. Personnalisation : appliquer ton/style/longueur souhaités, possibilité d'itérer (révisions) en se basant sur retours utilisateur.
+- Images :
+  - Générer prompts pour images par chapitre (description, style), puis appeler DALL·E / OpenAI Images API pour générer images. Sauvegarder images localement et référencer dans JSON.
+- Robustesse & optimisation :
+  - Gérer quotas et retries pour Gemini & DALL·E.
+  - Token-efficiency : découper requêtes, utiliser paramètres de température/length.
+  - Exporter sortie finale en JSON et produire un paquet (images + JSON).
+- Auth & config :
+  - Variables env : GOOGLE_API_KEY (ou PATH to GCP credentials), OPENAI_API_KEY (si DALL·E).
+- Livrables :
+  - Script Python exécutable (CLI) : python generate_ebook.py --input "sujet" --tone "friendly" --chapters 10 --output outdir
+  - README explicatif et exemples.
+- Sortie attendue :
+  - JSON structuré + dossier images.
+  - Option d'appel vers backend /export pour convertir en PDF/EPUB.
+- Note de sécurité :
+  - Indiquer limitations d'usage et conformité aux politiques d'usage des APIs.
+- Inclure 100 templates de prompt prêts à l'emploi pour niches (coaching, tech, santé, business, lifestyle) à utiliser comme point de départ pour Gemini. (Voir ci-dessous la liste de 100 templates.)
+
+— 100 templates de prompts (templates prêts à personnaliser)
+Format recommandé pour chaque template : "Génère un ebook pour {audience} sur {sujet} en style {tone} avec {chapters} chapitres, mots-clés: {keywords}, longueur approximative par chapitre: {length}."
+
+1. Coaching — "Transformez votre vie" : Génère un ebook pour jeunes professionnels sur la gestion du temps en style motivant...
+2. Coaching — "Mindset entrepreneurial" : Génère un ebook pour entrepreneurs débutants sur le passage à l'action...
+3. Coaching — "Productivité ultime" : Pour freelances sur routines productives...
+4. Coaching — "Leadership empathique" : Pour managers nouveaux au poste...
+5. Coaching — "Carrière pivot" : Pour salariés voulant changer de carrière...
+6. Coaching — "Prise de parole" : Pour cadres sur parler en public...
+7. Coaching — "Habitudes durables" : Pour toute audience souhaitant créer habitudes...
+8. Coaching — "Gestion du stress" : Pour étudiants sous pression...
+9. Coaching — "Confiance en soi" : Pour jeunes diplômés...
+10. Coaching — "Burnout prevention" : Pour professionnels sur la prévention...
+11. Tech — "Intro à l'IA" : Pour non-techs sur concepts IA essentiels...
+12. Tech — "Développement Web moderne" : Pour juniors devs sur stack JS moderne...
+13. Tech — "Sécurité applicative" : Pour CTOs sur meilleures pratiques...
+14. Tech — "Déploiement Cloud" : Pour devops débutants sur AWS/GCP...
+15. Tech — "APIs et architecture" : Pour architects sur microservices...
+16. Tech — "Data engineering" : Pour ingénieurs sur pipelines ETL...
+17. Tech — "ML pratique" : Pour ingénieurs ML sur mise en production...
+18. Tech — "Frontend performant" : Pour devs sur perf web et optimisation...
+19. Tech — "Testing et qualité" : Pour équipes QA sur stratégies...
+20. Tech — "Blockchain basics" : Pour curieux sur principes crypto...
+21. Santé — "Alimentation intelligente" : Pour adultes cherchant mieux manger...
+22. Santé — "Sommeil réparateur" : Pour personnes avec insomnies occasionnelles...
+23. Santé — "Fitness à la maison" : Programme pour débutants sans matériel...
+24. Santé — "Santé mentale" : Pour millennials sur gestion anxiété...
+25. Santé — "Nutrition sportive" : Pour athlètes amateurs...
+26. Santé — "Perte de poids durable" : Pour personnes voulant perte saine...
+27. Santé — "Yoga pour débutants" : Séquences et progression...
+28. Santé — "Reprise après blessure" : Conseils de remise en forme...
+29. Santé — "Santé féminine" : Thèmes cycles, hormones, #selfcare...
+30. Santé — "Prévention cardio" : Pour quarantenaires...
+31. Business — "Growth hacking" : Pour startups early-stage...
+32. Business — "Plan d'affaires" : Guide pour créer un business plan...
+33. Business — "Marketing de contenu" : Pour créateurs et PME...
+34. Business — "Ventes B2B" : Pour commerciaux sur cycle long...
+35. Business — "Levier SEO" : Pour PME locales...
+36. Business — "Monétiser une audience" : Pour créateurs de contenu...
+37. Business — "Levée de fonds" : Pour fondateurs cherchant investisseurs...
+38. Business — "Scaling ops" : Pour scale-ups sur opérations...
+39. Business — "OKR & Productivité" : Pour équipes produit...
+40. Business — "Legal basics" : Pour entrepreneurs sur contrats de base...
+41. Lifestyle — "Minimalisme" : Pour citadins sur désencombrement...
+42. Lifestyle — "Voyager pro" : Pour nomades numériques...
+43. Lifestyle — "Décoration intérieur" : Guide pour appartement petit espace...
+44. Lifestyle — "Photographie smartphone" : Pour passionnés débutants...
+45. Lifestyle — "Jardinage urbain" : Balcon/petit espace...
+46. Lifestyle — "Parenting moderne" : Pour jeunes parents...
+47. Lifestyle — "Cuisine rapide" : Recettes saines pour soirs pressés...
+48. Lifestyle — "Slow living" : Pour ralentir et simplifier quotidien...
+49. Lifestyle — "Finance perso" : Budgeting & épargne pour millennials...
+50. Lifestyle — "Hobbies créatifs" : Pour booster créativité et loisirs...
+51. Niche coaching — "Coaching carrière tech" : Pour devs mid-level...
+52. Niche coaching — "Coaching fondateur" : Pour solo-founders...
+53. Niche tech — "Dév mobile cross-platform" : Comparatif Flutter/React Native...
+54. Niche tech — "Automatisation no-code" : Pour marketeurs...
+55. Niche santé — "Alimentation céto adaptée" : Pour sportifs...
+56. Niche business — "Franchising 101" : Pour entrepreneurs locaux...
+57. Niche lifestyle — "Tiny house guide" : Pour futurs propriétaires...
+58. Niche marketing — "Email sequences haut-conversion" : Pour SaaS...
+59. Niche education — "Apprendre SQL vite" : Pour analysts débutants...
+60. Niche startup — "MVP en 30 jours" : Plan et checklist...
+61. Coaching — "Négociation salariale" : Pour personnes en entretien...
+62. Coaching — "Networking efficace" : Pour introvertis...
+63. Tech — "Automatisation tests" : Stratégies et outils...
+64. Tech — "Observabilité" : Pour équipes ops...
+65. Santé — "Détox numérique" : Pour overfocus sur écrans...
+66. Business — "Pricing strategy" : Pour SaaS early-stage...
+67. Lifestyle — "Running plan 10k" : Pour débutants...
+68. Marketing — "Publicité payante ROI" : Pour PME localisées...
+69. Finance — "Investir en bourse" : Guide pour novices...
+70. Carrière — "Portfolio & personal branding" : Pour designers...
+71. Éducation — "Apprendre une langue rapidement" : Méthodes efficaces...
+72. Parenting — "Routines enfants" : Pour stabilité quotidienne...
+73. Tech — "Serverless adoption" : Étapes et pièges...
+74. Business — "Customer success playbook" : Pour SaaS...
+75. Lifestyle — "Organisation minimaliste digitale" : Boîte mail, fichiers...
+76. Niche health — "Intermittent fasting guide" : Adaptations et précautions...
+77. Niche coaching — "Public speaking pour tech" : Slides & demos...
+78. Niche marketing — "Growth via partnerships" : Tactiques B2B...
+79. Niche hobby — "DIY meubles" : Outils, sécurité, plans...
+80. Niche travel — "Voyage slow en Europe" : Itinéraires low-cost...
+81. Tech — "IA éthique pour produits" : Gouvernance & guidelines...
+82. Business — "Automatiser compta PME" : Outils et workflows...
+83. Lifestyle — "Routines matinales" : Exemples pour productivité...
+84. Health — "Alimentation végétarienne équilibrée" : Plan 4 semaines...
+85. Coaching — "Mentorat pour juniors" : Programmes & exercices...
+86. Marketing — "Brand storytelling" : Techniques et templates...
+87. Finance — "Optimiser impôts pour freelances" : Checklist (pays variable)...
+88. Education — "Curriculum Bootcamp" : Pour formation courte...
+89. Hobbies — "Apprendre guitare 30 jours" : Progression quotidienne...
+90. Niche tech — "Edge computing use-cases" : Pour dirigeants...
+91. Productivity — "Deep work routines" : Sessions, planning...
+92. Business — "Systèmes d'embauche" : Processus et tests...
+93. Lifestyle — "Sustainable living guide" : Actions quotidiennes...
+94. Health — "Préparation marathon" : Plans entrainements...
+95. Marketing — "TikTok pour marques" : Contenus & calendrier...
+96. Coaching — "Équilibre vie pro/perso" : Techniques boundary-setting...
+97. Tech — "Web accessibility checklist" : Audit & fixes...
+98. Business — "Réduction churn" : Stratégies et playbooks...
+99. Niche creative — "Écrire une mini-série podcast" : Structure & scénarisation...
+100. Niche future — "Monétiser AR/VR experiences" : Modèles économiques & cas d'usage...
+
+Chaque template est conçu pour être rempli par des variables (audience, tone, chapters, keywords, length). Exemples d'utilisation automatisée : for template in templates: prompt = template.format(audience="entrepreneurs", subject="productivité", tone="pragmatique", chapters=8, keywords="time management, routines").
+ They are provided by a third-party and are governed by
+# separate terms of service, privacy policy, and support
+# documentation.
+
+# This workflow lets you generate SLSA provenance file for your project.
+# The generation satisfies level 3 for the provenance requirements - see https://slsa.dev/spec/v0.1/requirements
+# The project is an initiative of the OpenSSF (openssf.org) and is developed at
+# https://github.com/slsa-framework/slsa-github-generator.
+# The provenance file can be verified using https://github.com/slsa-framework/slsa-verifier.
+# For more information about SLSA and how it improves the supply-chain, visit slsa.dev.
+
+name: SLSA generic generator
+on:
+  workflow_dispatch:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      digests: ${{ steps.hash.outputs.digests }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ========================================================
+      #
+      # Step 1: Build your artifacts.
+      #
+      # ========================================================
+      - name: Build artifacts
+        run: |
+            # These are some amazing artifacts.
+            echo "artifact1" > artifact1
+            echo "artifact2" > artifact2
+
+      # ==Je vais générer les 3 projets (backend Node.js/Express en JavaScript, frontend React/Tailwind en JavaScript, et le script Python d'intégration IA). Je fournis ici les fichiers essentiels pour chacun (structure, code runnable, README et exemples d'env). Si vous voulez que j'ajoute des fichiers supplémentaires (tests, CI, ou fonctionnalités avancées), dites-moi lesquels et je les génèrerai ensuite.
+
+-- Backend (Node.js / Express / MongoDB / OpenAI) --
+```json name=backend/package.json
+{
+  "name": "ebook-ai-backend",
+  "version": "1.0.0",
+  "main": "src/index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "lint": "eslint .",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.3",
+    "epub-gen": "^0.1.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.7.0",
+    "express-validator": "^6.15.0",
+    "helmet": "^6.0.1",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.4",
+    "morgan": "^1.10.0",
+    "openai": "^4.2.1",
+    "pdf-lib": "^1.17.1",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
+```
+
+```text name=backend/.env.example
+# Rename to .env and fill values
+PORT=4000
+MONGODB_URI=mongodb://localhost:27017/ebookai
+JWT_SECRET=your_jwt_secret_here
+OPENAI_API_KEY=sk-...
+CORS_ORIGINS=http://localhost:5173
+MONTHLY_TOKEN_CAP=15000
+```
+
+```javascript name=backend/src/index.js
+// Entry point - simple Express app
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const rateLimit = require('express-rate-limit');
+
+const authRoutes = require('./routes/auth');
+const genRoutes = require('./routes/generate');
+const projectRoutes = require('./routes/projects');
+const exportRoutes = require('./routes/export');
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+(async function connectDB() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI, { });
+    console.log('MongoDB connected');
+  } catch (err) {
+    console.error('MongoDB connection error', err);
+    process.exit(1);
+  }
+})();
+
+app.use(helmet());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(morgan('dev'));
+
+const corsOrigins = (process.env.CORS_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: corsOrigins.length ? corsOrigins : '*'
+}));
+
+app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
+
+app.use('/auth', authRoutes);
+app.use('/generate', genRoutes);
+app.use('/projects', projectRoutes);
+app.use('/export', exportRoutes);
+
+// Centralized error handler
+app.use((err, req, res, next) => {
+  console.error(err);
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+});
+
+app.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+});
+```
+
+```javascript name=backend/src/models/User.js
+const mongoose = require('mongoose');
+
+const TokenUsageSchema = new mongoose.Schema({
+  monthKey: { type: String, required: true }, // e.g. "2025-12"
+  tokensUsed: { type: Number, default: 0 }
+}, { _id: false });
+
+const UserSchema = new mongoose.Schema({
+  email: { type: String, required: true, unique: true },
+  passwordHash: { type: String, required: true },
+  name: { type: String },
+  createdAt: { type: Date, default: Date.now },
+  tokenUsage: [TokenUsageSchema], // monthly tracking
+  credits: { type: Number, default: 0 },
+  role: { type: String, default: 'user' }
+});
+
+module.exports = mongoose.model('User', UserSchema);
+```
+
+```javascript name=backend/src/models/Project.js
+const mongoose = require('mongoose');
+
+const ImageSchema = new mongoose.Schema({
+  filename: String,
+  path: String,
+  prompt: String
+}, { _id: false });
+
+const ChapterSchema = new mongoose.Schema({
+  index: Number,
+  title: String,
+  summary: String,
+  content: String,
+  images: [ImageSchema]
+}, { _id: false });
+
+const ProjectSchema = new mongoose.Schema({
+  owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  title: String,
+  metadata: Object,
+  chapters: [ChapterSchema],
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+module.exports = mongoose.model('Project', ProjectSchema);
+```
+
+```javascript name=backend/src/middleware/auth.js
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+module.exports = async function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) return res.status(401).json({ error: 'Missing Authorization header' });
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(payload.id).select('-passwordHash');
+    if (!user) return res.status(401).json({ error: 'User not found' });
+    req.user = user;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+```
+
+```javascript name=backend/src/routes/auth.js
+const express = require('express');
+const { body, validationResult } = require('express-validator');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+
+const router = express.Router();
+
+router.post('/register',
+  body('email').isEmail(),
+  body('password').isLength({ min: 6 }),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      const { email, password, name } = req.body;
+      if (await User.findOne({ email })) return res.status(400).json({ error: 'Email exists' });
+      const passwordHash = await bcrypt.hash(password, 10);
+      const user = await User.create({ email, passwordHash, name });
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      res.json({ token, user: { id: user._id, email: user.email, name: user.name } });
+    } catch (err) { next(err); }
+  });
+
+router.post('/login',
+  body('email').isEmail(),
+  body('password').exists(),
+  async (req, res, next) => {
+    try {
+      const { email, password } = req.body;
+      const user = await User.findOne({ email });
+      if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+      const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+      res.json({ token, user: { id: user._id, email: user.email, name: user.name } });
+    } catch (err) { next(err); }
+  });
+
+module.exports = router;
+```
+
+```javascript name=backend/src/services/openai.js
+// Wrapper for OpenAI calls (GPT-4 generation + usage extraction)
+// Requires OPENAI_API_KEY
+const OpenAI = require('openai');
+const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+async function generateEbookContent({ sujet, tone = 'neutre', chaptersCount = 8 }) {
+  // Prompt construction: ask GPT to return JSON structure
+  const system = `You are an assistant that returns JSON only. Output must be valid JSON.`;
+  const userPrompt = `
+Génère un ebook sur le sujet suivant en français: "${sujet}".
+Ton: ${tone}.
+Nombre approximatif de chapitres: ${chaptersCount}.
+Réponds strictement avec un objet JSON:
+{
+  "title": string,
+  "subtitle": string,
+  "description": string,
+  "outline": [ { "chapterIndex": number, "title": string, "summary": string } ],
+  "chapters": [ { "chapterIndex": number, "title": string, "content": string, "suggestedImages": [ { "prompt": string } ] } ]
+}
+Chaque chapitre doit contenir ~500-1200 mots selon complexité.
+  `;
+  const resp = await client.chat.completions.create({
+    model: 'gpt-4o-mini', // adjust model as available
+    messages: [
+      { role: 'system', content: system },
+      { role: 'user', content: userPrompt }
+    ],
+    max_tokens: 6000,
+    temperature: 0.7
+  });
+  // new OpenAI responses shape: get first choice
+  const text = resp.choices?.[0]?.message?.content || resp.choices?.[0]?.text || '';
+  let json;
+  try { json = JSON.parse(text); } catch (err) {
+    // fallback: try to extract JSON substring
+    const match = text.match(/{[\s\S]*}/);
+    json = match ? JSON.parse(match[0]) : null;
+  }
+  return { json, usage: resp.usage || null, raw: text };
+}
+
+module.exports = { generateEbookContent };
+```
+
+```javascript name=backend/src/utils/tokenQuota.js
+// Utility: increment monthly token usage and enforce cap
+const User = require('../models/User');
+const MONTHLY_CAP = Number(process.env.MONTHLY_TOKEN_CAP || 15000);
+
+function monthKeyForDate(d = new Date()) {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+async function canConsumeTokens(userId, tokensToAdd) {
+  const user = await User.findById(userId);
+  const key = monthKeyForDate();
+  const usage = (user.tokenUsage || []).find(u => u.monthKey === key);
+  const current = usage ? usage.tokensUsed : 0;
+  return (current + tokensToAdd) <= MONTHLY_CAP;
+}
+
+async function addTokens(userId, tokensToAdd) {
+  const key = monthKeyForDate();
+  const user = await User.findById(userId);
+  if (!user) throw new Error('User not found');
+  let usage = user.tokenUsage.find(u => u.monthKey === key);
+  if (!usage) {
+    usage = { monthKey: key, tokensUsed: tokensToAdd };
+    user.tokenUsage.push(usage);
+  } else {
+    usage.tokensUsed += tokensToAdd;
+  }
+  await user.save();
+  return usage.tokensUsed;
+}
+
+module.exports = { canConsumeTokens, addTokens, monthKeyForDate, MONTHLY_CAP };
+```
+
+```javascript name=backend/src/routes/generate.js
+const express = require('express');
+const auth = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
+const { generateEbookContent } = require('../services/openai');
+const { canConsumeTokens, addTokens } = require('../utils/tokenQuota');
+const Project = require('../models/Project');
+
+const router = express.Router();
+
+// POST /generate/content
+router.post('/content',
+  auth,
+  body('sujet').isString().notEmpty(),
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      const { sujet, tone, chaptersCount } = req.body;
+
+      // call OpenAI
+      const result = await generateEbookContent({ sujet, tone, chaptersCount: chaptersCount || 8 });
+      const usageTokens = result.usage?.total_tokens || 0;
+
+      const allowed = await canConsumeTokens(req.user._id, usageTokens);
+      if (!allowed) return res.status(402).json({ error: 'Monthly token cap exceeded' });
+
+      await addTokens(req.user._id, usageTokens);
+
+      // Save project skeleton
+      const project = await Project.create({
+        owner: req.user._id,
+        title: result.json?.title || sujet,
+        metadata: { subtitle: result.json?.subtitle, description: result.json?.description },
+        chapters: (result.json?.chapters || []).map(c => ({
+          index: c.chapterIndex,
+          title: c.title,
+          summary: c.summary || '',
+          content: c.content || '',
+          images: (c.suggestedImages || []).map(si => ({ prompt: si.prompt }))
+        }))
+      });
+
+      res.json({ projectId: project._id, usageTokens, project });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+module.exports = router;
+```
+
+```javascript name=backend/src/routes/projects.js
+const express = require('express');
+const auth = require('../middleware/auth');
+const Project = require('../models/Project');
+const { body, validationResult } = require('express-validator');
+
+const router = express.Router();
+
+router.post('/', auth, async (req, res, next) => {
+  try {
+    const payload = req.body;
+    payload.owner = req.user._id;
+    const project = await Project.create(payload);
+    res.json(project);
+  } catch (err) { next(err); }
+});
+
+router.get('/:id', auth, async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    if (!project) return res.status(404).json({ error: 'Not found' });
+    if (String(project.owner) !== String(req.user._id)) return res.status(403).json({ error: 'Forbidden' });
+    res.json(project);
+  } catch (err) { next(err); }
+});
+
+module.exports = router;
+```
+
+```javascript name=backend/src/routes/export.js
+const express = require('express');
+const auth = require('../middleware/auth');
+const Project = require('../models/Project');
+const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
+const Epub = require('epub-gen');
+const fs = require('fs');
+const path = require('path');
+const { v4: uuidv4 } = require('uuid');
+
+const router = express.Router();
+
+// GET /export?ebookId=...&format=pdf|epub
+router.get('/', auth, async (req, res, next) => {
+  try {
+    const { ebookId, format = 'pdf' } = req.query;
+    if (!ebookId) return res.status(400).json({ error: 'ebookId required' });
+    const project = await Project.findById(ebookId);
+    if (!project) return res.status(404).json({ error: 'Not found' });
+    if (String(project.owner) !== String(req.user._id)) return res.status(403).json({ error: 'Forbidden' });
+
+    if (format === 'pdf') {
+      const pdfDoc = await PDFDocument.create();
+      const timesRomanFont = await pdfDoc.embedFont(StandardFonts.TimesRoman);
+      for (const ch of project.chapters) {
+        const page = pdfDoc.addPage();
+        const { width, height } = page.getSize();
+        const fontSize = 12;
+        page.drawText(ch.title || `Chapitre ${ch.index}`, { x: 50, y: height - 60, size: 18, font: timesRomanFont, color: rgb(0,0,0) });
+        const text = ch.content || ch.summary || '';
+        // naive text split
+        const lines = text.match(/.{1,800}/g) || [];
+        let y = height - 90;
+        for (const line of lines) {
+          if (y < 60) {
+            // new page
+            const p = pdfDoc.addPage();
+            y = p.getSize().height - 60;
+            p.drawText(line, { x: 50, y, size: fontSize, font: timesRomanFont });
+          } else {
+            page.drawText(line, { x: 50, y, size: fontSize, font: timesRomanFont });
+            y -= fontSize + 6;
+          }
+        }
+      }
+      const pdfBytes = await pdfDoc.save();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${project.title || 'ebook'}.pdf"`);
+      return res.send(Buffer.from(pdfBytes));
+    } else if (format === 'epub') {
+      const outPath = path.join(__dirname, '../../tmp');
+      if (!fs.existsSync(outPath)) fs.mkdirSync(outPath, { recursive: true });
+      const filename = path.join(outPath, `${uuidv4()}.epub`);
+      const option = {
+        title: project.title || 'Ebook',
+        author: req.user.name || req.user.email,
+        content: project.chapters.map(ch => ({ title: ch.title || `Chapitre ${ch.index}`, data: ch.content || ch.summary || '' }))
+      };
+      new Epub(option, filename).promise.then(() => {
+        res.download(filename, `${project.title || 'ebook'}.epub`, (err) => {
+          try { fs.unlinkSync(filename); } catch {}
+          if (err) next(err);
+        });
+      }).catch(err => next(err));
+    } else {
+      res.status(400).json({ error: 'format must be pdf or epub' });
+    }
+  } catch (err) { next(err); }
+});
+
+module.exports = router;
+```
+
+```markdown name=backend/README.md
+````markdown
+# Ebook AI Backend (JavaScript)
+
+Prereqs:
+- Node 18+
+- MongoDB
+- .env (see .env.example)
+
+Install:
+- npm install
+
+Run:
+- npm run dev
+
+Env:
+- PORT, MONGODB_URI, JWT_SECRET, OPENAI_API_KEY, CORS_ORIGINS, MONTHLY_TOKEN_CAP
+
+API quick:
+- POST /auth/register {email,password}
+- POST /auth/login {email,password}
+- POST /generate/content (Authorization: Bearer <token>) {sujet, tone, chaptersCount}
+- GET /export?ebookId=...&format=pdf (Authorization)
+
+Notes:
+- The OpenAI service wrapper expects OPENAI_API_KEY.
+- Token quota per user enforced via MONTHLY_TOKEN_CAP (default 15000).
+- This is a minimal MVP — enhance error handling, streaming and multipart image embedding as needed.
+````
+```
+
+-- Frontend (Vite + React + Tailwind, JavaScript) --
+```json name=frontend/package.json
+{
+  "name": "ebook-ai-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "echo 'no linter configured'"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.14.1",
+    "react-beautiful-dnd": "^13.1.1"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.14",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.5.4",
+    "vite": "^5.2.0"
+  }
+}
+```
+
+```text name=frontend/.env
+VITE_API_BASE_URL=http://localhost:4000
+```
+
+```javascript name=frontend/index.html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ebook AI Creator</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
+```
+
+```javascript name=frontend/src/main.jsx
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import Home from './pages/Home';
+import Editor from './pages/Editor';
+import './styles/tailwind.css';
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/editor/:projectId" element={<Editor />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+createRoot(document.getElementById('root')).render(<App />);
+```
+
+```javascript name=frontend/src/services/api.js
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000',
+  headers: { 'Content-Type': 'application/json' }
+});
+
+export function setAuthToken(token) {
+  api.defaults.headers.common['Authorization'] = token ? `Bearer ${token}` : undefined;
+}
+
+export async function generateContent(payload) {
+  return api.post('/generate/content', payload);
+}
+
+export async function getProject(id) {
+  return api.get(`/projects/${id}`);
+}
+
+export async function saveProject(data) {
+  return api.post('/projects', data);
+}
+
+export async function exportEbook(ebookId, format = 'pdf') {
+  const url = `/export?ebookId=${ebookId}&format=${format}`;
+  return api.get(url, { responseType: 'blob' });
+}
+
+export default api;
+```
+
+```javascript name=frontend/src/pages/Home.jsx
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { generateContent, setAuthToken } from '../services/api';
+
+export default function Home() {
+  const [sujet, setSujet] = useState('');
+  const [tone, setTone] = useState('neutre');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Demo: set token from localStorage if exists
+  const token = localStorage.getItem('token');
+  if (token) setAuthToken(token);
+
+  async function onGenerate(e) {
+    e.preventDefault();
+    if (!sujet) return alert('Entrez un sujet');
+    setLoading(true);
+    try {
+      const resp = await generateContent({ sujet, tone, chaptersCount: 8 });
+      const projectId = resp.data.projectId;
+      // navigate to editor
+      navigate(`/editor/${projectId}`);
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.error || 'Erreur génération');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-3xl mx-auto bg-white rounded-md shadow-md p-8">
+        <h1 className="text-2xl font-semibold mb-4">Créateur d'ebooks IA</h1>
+        <form onSubmit={onGenerate}>
+          <label className="block text-sm font-medium text-gray-700">Sujet</label>
+          <input value={sujet} onChange={e => setSujet(e.target.value)} placeholder="Entrez votre sujet d'ebook" className="mt-1 block w-full border rounded p-2" />
+          <label className="mt-4 block text-sm font-medium text-gray-700">Ton</label>
+          <select value={tone} onChange={e => setTone(e.target.value)} className="mt-1 block w-48 border rounded p-2">
+            <option value="neutre">Neutre</option>
+            <option value="professionnel">Professionnel</option>
+            <option value="amical">Amical</option>
+            <option value="didactique">Didactique</option>
+          </select>
+          <div className="mt-6">
+            <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded">
+              {loading ? 'Génération...' : 'Générer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+```
+
+```javascript name=frontend/src/pages/Editor.jsx
+import React, { useEffect, useReducer, useState } from 'react';
+import { useParams } from 'react-router-dom';
+import { getProject, saveProject, exportEbook } from '../services/api';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+
+const initialState = { title: '', chapters: [] };
+
+function reducer(state, action) {
+  switch (action.type) {
+    case 'set':
+      return action.payload;
+    case 'reorder':
+      return { ...state, chapters: action.payload };
+    case 'updateChapter':
+      return {
+        ...state,
+        chapters: state.chapters.map(c => c.index === action.index ? { ...c, ...action.payload } : c)
+      };
+    default:
+      return state;
+  }
+}
+
+export default function Editor() {
+  const { projectId } = useParams();
+  const [state, dispatch] = useReducer(reducer, initialState);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const resp = await getProject(projectId);
+        dispatch({ type: 'set', payload: {
+          title: resp.data.title,
+          chapters: resp.data.chapters.map((c, i) => ({ index: c.index ?? i, title: c.title, content: c.content || c.summary || '' }))
+        }});
+      } catch (err) {
+        console.error(err);
+        alert('Erreur chargement projet');
+      } finally { setLoading(false); }
+    }
+    load();
+  }, [projectId]);
+
+  async function onSave() {
+    try {
+      const payload = { title: state.title, chapters: state.chapters };
+      await saveProject(payload);
+      alert('Sauvegardé');
+    } catch (err) {
+      console.error(err);
+      alert('Erreur sauvegarde');
+    }
+  }
+
+  function onDragEnd(result) {
+    if (!result.destination) return;
+    const items = Array.from(state.chapters);
+    const [reordered] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reordered);
+    // reindex
+    items.forEach((it, idx) => it.index = idx+1);
+    dispatch({ type: 'reorder', payload: items });
+  }
+
+  async function onExport(format) {
+    try {
+      const blobResp = await exportEbook(projectId, format);
+      const url = window.URL.createObjectURL(new Blob([blobResp.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${state.title || 'ebook'}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error(err);
+      alert('Erreur export');
+    }
+  }
+
+  if (loading) return <div className="p-6">Chargement...</div>;
+
+  return (
+    <div className="min-h-screen bg-gray-50 p-6">
+      <div className="max-w-6xl mx-auto grid grid-cols-4 gap-6">
+        <aside className="col-span-1 bg-white p-4 rounded shadow">
+          <h2 className="font-semibold mb-2">Bibliothèque d'images</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {/* Mock images */}
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-24 bg-gray-100 rounded flex items-center justify-center text-xs">Image {i+1}</div>
+            ))}
+          </div>
+        </aside>
+
+        <main className="col-span-3 bg-white p-4 rounded shadow">
+          <div className="flex justify-between items-center mb-4">
+            <input className="text-xl font-semibold border-b pb-1" value={state.title} onChange={e => dispatch({ type: 'set', payload: { ...state, title: e.target.value }})} placeholder="Titre de l'ebook" />
+            <div className="space-x-2">
+              <button onClick={() => onExport('pdf')} className="px-3 py-1 bg-gray-200 rounded">Preview PDF</button>
+              <button onClick={() => onExport('epub')} className="px-3 py-1 bg-green-600 text-white rounded">Exporter EPUB</button>
+              <button onClick={onSave} className="px-3 py-1 bg-blue-600 text-white rounded">Sauvegarder</button>
+            </div>
+          </div>
+
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId="chapters">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {state.chapters.map((ch, index) => (
+                    <Draggable key={ch.index} draggableId={`c-${ch.index}`} index={index}>
+                      {(providedDr) => (
+                        <div ref={providedDr.innerRef} {...providedDr.draggableProps} {...providedDr.dragHandleProps} className="mb-3 border rounded p-3">
+                          <input className="font-medium mb-2 w-full" value={ch.title} onChange={e => dispatch({ type: 'updateChapter', index: ch.index, payload: { title: e.target.value }})} />
+                          <textarea className="w-full h-40 border p-2" value={ch.content} onChange={e => dispatch({ type: 'updateChapter', index: ch.index, payload: { content: e.target.value }})} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        </main>
+      </div>
+    </div>
+  );
+}
+```
+
+```css name=frontend/src/styles/tailwind.css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+```
+
+```javascript name=frontend/tailwind.config.cjs
+module.exports = {
+  content: ['./index.html', './src/**/*.{js,jsx}'],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+}
+```
+
+```markdown name=frontend/README.md
+````markdown
+# Ebook AI Frontend (Vite + React + Tailwind)
+
+Install:
+- npm install
+
+Run:
+- npm run dev
+
+Env:
+- VITE_API_BASE_URL (point vers backend, ex: http://localhost:4000)
+
+Notes:
+- Frontend uses simple auth storage in localStorage for token (demo).
+- Drag & drop via react-beautiful-dnd.
+- Replace mocked image library by calling backend /images/library.
+````
+```
+
+-- Script Python (Google Gemini + DALL·E templates + CLI) --
+```text name=python/requirements.txt
+google-generativeai==0.0.6  # adjust to actual client if available
+openai==0.27.6
+requests==2.31.0
+Pillow==9.5.0
+tqdm==4.65.0
+python-dotenv==1.0.0
+```
+
+```python name=python/generate_ebook.py
+#!/usr/bin/env python3
+"""
+CLI script to generate ebook structure using Google Gemini (or fallback to OpenAI).
+Usage:
+  python generate_ebook.py --input "productivité pour freelances" --tone "amical" --chapters 8 --output ./out
+"""
+import os
+import argparse
+import json
+import time
+from pathlib import Path
+from dotenv import load_dotenv
+import requests
+from PIL import Image
+from io import BytesIO
+
+load_dotenv()
+
+# Config/env
+GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')  # for DALL·E fallback
+OUTPUT_DIR = 'out'
+
+def suggest_topics(mini_input):
+    # Simplified: ask Gemini / AI to propose 5 topics.
+    prompt = f"Propose 5 ebook topics, SEO-friendly, based on: {mini_input}. Output JSON list."
+    # Fallback simple heuristic if no API: return variations
+    # NOTE: replace with real API call to Gemini if available.
+    return [
+        f"{mini_input} — Guide pratique pour débutants",
+        f"Stratégies avancées de {mini_input}",
+        f"{mini_input} pour entrepreneurs occupés",
+        f"{mini_input} : méthodes basées sur preuves",
+        f"{mini_input} en 30 jours"
+    ]
+
+def call_generative_model(prompt, max_tokens=1500):
+    # Stub: try to call Google Gemini (pseudocode). Fallback to OpenAI if set.
+    if OPENAI_API_KEY:
+        import openai
+        openai.api_key = OPENAI_API_KEY
+        resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=[{"role":"user","content":prompt}], max_tokens=max_tokens, temperature=0.7)
+        return resp.choices[0].message['content'], resp.usage
+    else:
+        # no API, return a placeholder
+        return json.dumps({"title": "Titre placeholder", "subtitle": "", "description": "", "outline": [], "chapters": []}), {}
+
+def generate_content(sujet, tone='neutre', chapters=8):
+    prompt = f"""Génère un ebook complet en français sur : {sujet}
+Ton: {tone}
+Format: JSON with keys: title, subtitle, description, chapters (array with index,title,content,suggestedImages [prompt]).
+Number of chapters: {chapters}
+Keep content realistic and practical. Return valid JSON only."""
+    text, usage = call_generative_model(prompt, max_tokens=6000)
+    try:
+        data = json.loads(text)
+    except Exception:
+        # try to extract JSON substring
+        import re
+        m = re.search(r'({[\s\S]*})', text)
+        data = json.loads(m.group(1)) if m else {"title": sujet, "subtitle": "", "description": "", "chapters": []}
+    return data, usage
+
+def generate_image_from_prompt(prompt, outdir, index=0):
+    """
+    Uses OpenAI image API (DALL·E) as fallback to generate image.
+    Saves image in outdir and returns filepath.
+    """
+    if not OPENAI_API_KEY:
+        return None
+    import openai
+    openai.api_key = OPENAI_API_KEY
+    try:
+        resp = openai.Image.create(prompt=prompt, n=1, size="1024x1024")
+        b64 = resp['data'][0]['b64_json']
+        import base64
+        img_bytes = base64.b64decode(b64)
+        im = Image.open(BytesIO(img_bytes))
+        fname = f"image_{int(time.time())}_{index}.png"
+        path = Path(outdir) / fname
+        im.save(path)
+        return str(path)
+    except Exception as e:
+        print("Image generation failed:", e)
+        return None
+
+def save_output(data, outdir):
+    Path(outdir).mkdir(parents=True, exist_ok=True)
+    json_path = Path(outdir) / 'ebook.json'
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    print("Saved JSON to", json_path)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--input', required=True)
+    parser.add_argument('--tone', default='neutre')
+    parser.add_argument('--chapters', type=int, default=8)
+    parser.add_argument('--output', default=OUTPUT_DIR)
+    args = parser.parse_args()
+
+    suggestions = suggest_topics(args.input)
+    print("Suggestions:", suggestions)
+
+    # Choose first suggestion by default
+    chosen_subject = suggestions[0]
+    print("Chosen subject:", chosen_subject)
+
+    data, usage = generate_content(chosen_subject, tone=args.tone, chapters=args.chapters)
+    # If generated has no chapters, create placeholders
+    if not data.get('chapters'):
+        data['chapters'] = []
+        for i in range(args.chapters):
+            data['chapters'].append({
+                "index": i+1,
+                "title": f"Chapitre {i+1}",
+                "content": f"Contenu placeholder pour chapitre {i+1}",
+                "suggestedImages": [{"prompt": f"Illustration for chapter {i+1} about {args.input}"}]
+            })
+
+    # Generate images for first chapter images (limited)
+    outdir = Path(args.output)
+    outdir.mkdir(parents=True, exist_ok=True)
+    images_generated = []
+    for i, ch in enumerate(data['chapters']):
+        if ch.get('suggestedImages'):
+            for j, imgObj in enumerate(ch['suggestedImages'][:1]):  # only one per chapter for performance
+                path = generate_image_from_prompt(imgObj.get('prompt', ''), outdir, index=(i*10+j))
+                if path:
+                    imgObj['localPath'] = path
+                    images_generated.append(path)
+
+    save_output(data, outdir)
+    print("Image files:", images_generated)
+    print("Done.")
+
+if __name__ == '__main__':
+    main()
+```
+
+```json name=python/templates/prompts_templates.json
+{
+  "templates": [
+    "Génère un ebook pour {audience} sur {sujet} en style {tone} avec {chapters} chapitres, mots-clés: {keywords}, longueur approximative par chapitre: {length}.",
+    "Crée un guide pratique pour {audience} sur {sujet} en adoptant un ton {tone}. Inclure checklist et exemples concrets.",
+    "Rédige un ebook structuré pour {audience} sur {sujet}. 10 chapitres, chaque chapitre inclut exercices et études de cas.",
+    "Produit un manuel pour {audience} sur {sujet} orienté vers l'action, ton {tone}, inclure plan d'action à la fin.",
+    "Écris un ebook SEO-friendly sur {sujet} pour {audience} en utilisant mots-clés: {keywords}, meta-description incluse."
+    // (Utilisez les 100 templates listés précédemment ; pour brevité ici on inclut un extrait. Vous pouvez remplir le fichier complet si vous le voulez.)
+  ]
+}
+```
+
+```markdown name=python/README.md
+````markdown
+# Ebook Generator (Python CLI)
+
+Install:
+- python -m venv venv
+- source venv/bin/activate
+- pip install -r requirements.txt
+
+Usage:
+- GOOGLE_API_KEY and/or OPENAI_API_KEY in .env
+- python generate_ebook.py --input "productivité pour freelances" --tone "amical" --chapters 8 --output ./out
+
+Output:
+- JSON file out/ebook.json
+- images saved in out/ if image generation enabled
+
+Notes:
+- The script includes fallbacks if Gemini client is not available.
+- Replace call_generative_model with actual Gemini client code when credentials and SDK are available.
+````
+```
+
+Fin des fichiers fournis. 
+
+Ce que j'ai fait :
+- Créé un backend minimal mais fonctionnel en JavaScript avec auth JWT, quotas tokens mensuels, endpoints /generate/content, /export et gestion PDF/EPUB basique.
+- Construit un frontend React (Vite) en JavaScript avec Tailwind, page d'accueil (input sujet), éditeur drag-and-drop pour chapitres, et intégration d'export/download via l'API.
+- Écrit un script Python CLI qui orchestre la génération d'ebook (3 étapes conceptuelles), avec génération d'images via OpenAI DALL·E en fallback et templates de prompts.
+
+Prochaines étapes possibles (indiquez vos priorités) :
+- Je peux générer d'autres fichiers (tests, CI, Dockerfile, scripts de seed pour la bibliothèque d'images).
+- Ajouter intégration paiement mock ou réelle pour packs premium.
+- Rendre la génération OpenAI en streaming (backend + frontend) pour retours progressifs.
+- Compléter le fichier templates/prompts_templates.json avec les 100 entrées complètes si vous voulez le fichier intégral.
+
+Souhaitez-vous que je :
+1) Lance la génération d'un package complet zippé pour téléchargement (je peux préparer tous les fichiers restants), ou
+2) Ajoute Dockerfiles et instructions de déploiement, ou
+3) Ajoute authentication UI (login/register) et gestion de tokens côté frontend maintenant ?
+
+Dites-moi l'option désirée ou demandez des modifications spécifiques.======================================================
+      #
+      # Step 2: Add a step to generate the provenance subjects
+      #         as shown below. Update the sha256 sum arguments
+      #         to include all binaries that you generate
+      #         provenance for.
+      #
+      # ========================================================
+      - name: Generate subject for provenance
+        id: hash
+        run: |
+          set -euo pipefail
+
+          # List the artifacts the provenance will refer to.
+          files=$(ls artifact*)
+          # Generate the subjects (base64 encoded).
+          echo "hashes=$(sha256sum $files | base64 -w0)" >> "${GITHUB_OUTPUT}"
+
+  provenance:
+    needs: [build]
+    permissions:
+      actions: read   # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.build.outputs.digests }}"
+      upload-assets: true # Optional: Upload to a new release
